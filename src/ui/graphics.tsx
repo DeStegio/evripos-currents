@@ -146,6 +146,10 @@ export function StraitView({
   }, [drift, still, strength]);
 
   const flow = still ? RULE_CHART : north ? NORTH : SOUTH;
+  // The lines are always drawn left to right, so the sign of the dash offset is the
+  // only thing carrying direction. Reversing the end points as well would cancel it
+  // out and drift both states the same way. Offset runs negative to travel with the
+  // line, so north sweeps right and south sweeps left.
   const offset = drift.interpolate({
     inputRange: [0, 1],
     outputRange: [0, north ? -DASH_PERIOD : DASH_PERIOD],
@@ -167,9 +171,9 @@ export function StraitView({
         return (
           <AnimatedLine
             key={y}
-            x1={north === false ? STRAIT_WIDTH - 8 : 8}
+            x1={8}
             y1={y}
-            x2={north === false ? 8 : STRAIT_WIDTH - 8}
+            x2={STRAIT_WIDTH - 8}
             y2={y}
             stroke={flow}
             strokeWidth={strong ? 2.4 : 1.6}
