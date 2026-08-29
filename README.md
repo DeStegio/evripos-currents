@@ -11,11 +11,12 @@ calculations.
 
 | View | What it shows |
 | --- | --- |
-| Now | Estimated direction, cycle phase, next reversal countdown and a 24-hour chart |
+| Now | Estimated direction, cycle phase, next reversal countdown, a strait schematic and a 24-hour chart |
 | Day | The four expected direction changes for a selected day |
-| Forecast | A seven-day overview with lunar day, current curve and reversal times |
-| Sky | Strait map, Sun and Moon positions, altitude and lunar phase |
-| Guide | Notification controls, methodology, reliability notes and source links |
+| 6 days | A six-day overview with lunar day, current curve and reversal times |
+| Map | Strait map, Sun and Moon azimuth and the upcoming lunar phases |
+| Alerts | Notification controls |
+| Guide | Methodology, reliability notes, source links and legend |
 
 A few things worth knowing about the build:
 
@@ -64,9 +65,16 @@ and the Android exact-alarm permission.
 npm run verify
 ```
 
-That runs Expo ESLint, TypeScript without emitting files, and the reference checks
-for the current-prediction model. The model check can also run on its own with
-`npm run test:model`.
+That runs Expo ESLint, TypeScript without emitting files, the reference checks for the
+current-prediction model (`npm run test:model`), and the live-derivation checks
+(`npm run test:live`).
+
+The live checks exist because a release build must not quietly differ from development.
+They assert that distinct instants produce distinct readings — nothing on screen is a
+fixture — and that the Europe/Athens offset derived from the EU daylight-saving rule
+matches ICU on every hour between 2024 and 2030, including both switch instants. That
+fallback is what keeps the clock correct if the JavaScript engine in a release APK ships
+without a time-zone database.
 
 ## Structure
 
@@ -74,15 +82,20 @@ for the current-prediction model. The model check can also run on its own with
 src/
   app/
     _layout.tsx                    app shell and global configuration
-    index.tsx                      five-tab interface and visualizations
+    index.tsx                      six-tab interface
   features/
     evripos-model.ts               current table, prediction and astronomy model
     notification-service.ts        native notification scheduling
     notification-service.web.ts    web fallback
+  ui/
+    theme.ts                       palette, type and spacing tokens
+    primitives.tsx                 label, stat cell and toggle
+    graphics.tsx                   curve, strait views, moon, azimuth dial, tab icons
 scripts/
   verify-evripos-model.ts          reference cases for model behavior
+  verify-live-model.ts             live-derivation and time-zone fallback checks
 assets/images/
-  chalkida-map.png                 map used in the Sky view
+  chalkida-map.png                 map used in the Map view
 ```
 
 ## Method and sources

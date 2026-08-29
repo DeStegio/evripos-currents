@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64" role="img" aria-label="Εύριπος app icon">
+  <rect width="64" height="64" rx="14" fill="#14395c"></rect>
+  <line x1="8" y1="32" x2="56" y2="32" stroke="#f3efe6" stroke-width="0.9" opacity="0.34"></line>
+  <path d="M4 32C13 11 22 11 32 32c10 21 19 21 28 0" fill="none" stroke="#f3efe6" stroke-width="3" stroke-linecap="round"></path>
+  <circle cx="18" cy="19.6" r="4.2" fill="#e4661f"></circle>
+</svg>
