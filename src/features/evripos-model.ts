@@ -4,12 +4,8 @@ import {
 } from 'astronomy-engine';
 
 export type Language = 'el' | 'en';
-export type AppTab = 'now' | 'day' | 'forecast' | 'sky' | 'guide';
+export type AppTab = 'now' | 'day' | 'forecast' | 'map' | 'alerts' | 'guide';
 export type FlowDirection = 'north' | 'south' | 'slack' | 'irregular';
-
-export const NORTH = '#45D99A';
-export const SOUTH = '#FF6B52';
-export const GOLD = '#E8C27A';
 
 export const CHALKIDA_LATITUDE = 38.4644;
 export const CHALKIDA_LONGITUDE = 23.5936;
@@ -69,8 +65,8 @@ export const copy = {
     coordinates: '38.4644 Β  ·  23.5936 Α',
     change: 'ΑΛΛΑΓΗ',
     flowingNow: 'ΠΡΟΒΛΕΨΗ ΡΕΥΜΑΤΟΣ',
-    northward: 'ΠΡΟΣ ΒΟΡΡΑ',
-    southward: 'ΠΡΟΣ ΝΟΤΟ',
+    northward: 'Προς βορρά',
+    southward: 'Προς νότο',
     fromSouth: 'Το νερό τρέχει από νότο',
     fromNorth: 'Το νερό τρέχει από βορρά',
     speed: 'ΦΑΣΗ ΚΥΚΛΟΥ',
@@ -87,6 +83,11 @@ export const copy = {
     forecastNote: 'Πρόβλεψη φοράς από τη σεληνιακή ηλικία και τον δημοσιευμένο πίνακα του Λιμεναρχείου. Δεν είναι live μέτρηση· η ώρα Αθήνας εφαρμόζεται ανά αλλαγή.',
     strait: 'Ο ΠΟΡΘΜΟΣ',
     straitNote: 'Τα βέλη δείχνουν προς πού τρέχει το νερό κάτω από τη γέφυρα αυτή τη στιγμή.',
+    openMap: 'ΟΛΟΣ Ο ΧΑΡΤΗΣ →',
+    mainland: 'ΣΤΕΡΕΑ ΕΛΛΑΔΑ',
+    evia: 'ΕΥΒΟΙΑ',
+    bridge: 'ΓΕΦΥΡΑ',
+    alertsNote: 'Ειδοποίηση πριν αλλάξει το ρεύμα, για να είστε στη γέφυρα την ώρα της αλλαγής.',
     dial: 'ΑΖΙΜΟΥΘΙΟ ΗΛΙΟΥ & ΣΕΛΗΝΗΣ',
     phases: 'ΦΑΣΕΙΣ ΤΗΣ ΣΕΛΗΝΗΣ',
     notifications: 'ΕΙΔΟΠΟΙΗΣΕΙΣ',
@@ -137,7 +138,7 @@ export const copy = {
     peakFlow: 'ΜΕΣΗ ΚΥΚΛΟΥ',
     easing: 'ΕΞΑΣΘΕΝΕΙ',
     tableSource: 'ΛΙΜΕΝΑΡΧΕΙΟ',
-    tabs: ['Τώρα', 'Ημέρα', 'Πρόγνωση', 'Ουρανός', 'Οδηγός'],
+    tabs: ['ΤΩΡΑ', 'ΗΜΕΡΑ', '6 ΗΜΕΡΕΣ', 'ΧΑΡΤΗΣ', 'ΕΙΔΟΠ.', 'ΟΔΗΓΟΣ'],
     turnsNorth: 'Γυρίζει προς βορρά',
     turnsSouth: 'Γυρίζει προς νότο',
     peak: 'μέγιστο',
@@ -156,8 +157,8 @@ export const copy = {
     coordinates: '38.4644 N  ·  23.5936 E',
     change: 'CHANGE',
     flowingNow: 'CURRENT FORECAST',
-    northward: 'NORTHWARD',
-    southward: 'SOUTHWARD',
+    northward: 'Northward',
+    southward: 'Southward',
     fromSouth: 'Water running from the south',
     fromNorth: 'Water running from the north',
     speed: 'CYCLE PHASE',
@@ -174,6 +175,11 @@ export const copy = {
     forecastNote: 'Direction forecast from lunar age and the published Port Authority table. It is not a live reading; Athens time is applied per event.',
     strait: 'THE STRAIT',
     straitNote: 'Arrows show where the water is running under the bridge right now.',
+    openMap: 'FULL MAP →',
+    mainland: 'MAINLAND',
+    evia: 'EVIA',
+    bridge: 'BRIDGE',
+    alertsNote: 'Get a notification before the current turns, so you can be on the bridge for it.',
     dial: 'SUN & MOON AZIMUTH',
     phases: 'MOON PHASES',
     notifications: 'NOTIFICATIONS',
@@ -224,7 +230,7 @@ export const copy = {
     peakFlow: 'MID-CYCLE',
     easing: 'EASING',
     tableSource: 'PORT AUTHORITY',
-    tabs: ['Now', 'Day', 'Forecast', 'Sky', 'Guide'],
+    tabs: ['NOW', 'DAY', '6 DAYS', 'MAP', 'ALERTS', 'GUIDE'],
     turnsNorth: 'Turns northward',
     turnsSouth: 'Turns southward',
     peak: 'peak',
@@ -242,20 +248,63 @@ export const copy = {
 
 type DateParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
-function athensParts(date: Date): DateParts {
+const ATHENS_STANDARD_OFFSET = 120;
+const ATHENS_SUMMER_OFFSET = 180;
+
+/** Last Sunday of a month at 01:00 UTC — the instant the EU switches clocks. */
+function euSwitchInstant(year: number, month: number) {
+  const lastOfMonth = new Date(Date.UTC(year, month + 1, 0));
+  return Date.UTC(year, month, lastOfMonth.getUTCDate() - lastOfMonth.getUTCDay(), 1);
+}
+
+/**
+ * Europe/Athens offset straight from the EU directive: EEST between the last Sunday
+ * of March and the last Sunday of October. Used whenever the engine has no usable
+ * time-zone database of its own.
+ */
+export function athensOffsetByRule(time: number) {
+  const year = new Date(time).getUTCFullYear();
+  const summer = time >= euSwitchInstant(year, 2) && time < euSwitchInstant(year, 9);
+  return summer ? ATHENS_SUMMER_OFFSET : ATHENS_STANDARD_OFFSET;
+}
+
+function intlAthensOffsetMinutes(date: Date) {
   const values = new Intl.DateTimeFormat('en-GB', {
     timeZone: ATHENS_TIME_ZONE,
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
   }).formatToParts(date);
   const part = (type: Intl.DateTimeFormatPartTypes) => Number(values.find((item) => item.type === type)?.value);
-  return { year: part('year'), month: part('month'), day: part('day'), hour: part('hour'), minute: part('minute'), second: part('second') };
+  const representedAsUtc = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+  return Math.round((representedAsUtc - date.getTime()) / 60_000);
 }
 
+/**
+ * Hermes exposes Intl through a platform ICU bridge we cannot inspect at build time,
+ * and a release APK may not carry a time-zone database at all. Probe it once against
+ * two instants whose Athens wall clock is known — midwinter is UTC+2, midsummer UTC+3 —
+ * and fall back to the rule above if the answer is wrong or the call throws.
+ */
+export const ATHENS_OFFSET_SOURCE: 'intl' | 'rule' = (() => {
+  try {
+    const winter = intlAthensOffsetMinutes(new Date('2024-01-15T00:00:00Z'));
+    const summer = intlAthensOffsetMinutes(new Date('2024-07-15T00:00:00Z'));
+    return winter === ATHENS_STANDARD_OFFSET && summer === ATHENS_SUMMER_OFFSET ? 'intl' : 'rule';
+  } catch {
+    return 'rule';
+  }
+})();
+
 function athensOffsetMinutes(date: Date) {
-  const p = athensParts(date);
-  const representedAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-  return Math.round((representedAsUtc - date.getTime()) / 60_000);
+  return ATHENS_OFFSET_SOURCE === 'intl' ? intlAthensOffsetMinutes(date) : athensOffsetByRule(date.getTime());
+}
+
+function athensParts(date: Date): DateParts {
+  const shifted = new Date(date.getTime() + athensOffsetMinutes(date) * 60_000);
+  return {
+    year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1, day: shifted.getUTCDate(),
+    hour: shifted.getUTCHours(), minute: shifted.getUTCMinutes(), second: shifted.getUTCSeconds(),
+  };
 }
 
 function athensCivilDate(year: number, month: number, day: number, hour: number, minute: number) {
@@ -428,32 +477,39 @@ export function formatMinute(minute: number) {
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
 }
 
+// Both locales render dates as dd/mm/yyyy and clocks as 24-hour, so the strings are
+// built by hand. That keeps every build — dev, web and release APK — byte-identical,
+// and removes the last dependency on the engine carrying locale data.
+const WEEKDAY_NAMES = {
+  el: ['Κυριακή', 'Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο'],
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+} as const;
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
 export function formatClock(date: Date | null | undefined) {
   if (!date) return '—';
-  return new Intl.DateTimeFormat('el-GR', {
-    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: ATHENS_TIME_ZONE,
-  }).format(date);
+  const p = athensParts(date);
+  return `${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
-export function formatEventDate(date: Date, language: Language) {
-  return new Intl.DateTimeFormat(language === 'el' ? 'el-GR' : 'en-GB', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    hour12: false, timeZone: ATHENS_TIME_ZONE,
-  }).format(date);
+export function formatEventDate(date: Date) {
+  const p = athensParts(date);
+  return `${pad2(p.day)}/${pad2(p.month)}/${p.year}, ${pad2(p.hour)}:${pad2(p.minute)}`;
 }
 
-export function formatDate(date: Date, language: Language, compact = false) {
-  return new Intl.DateTimeFormat(language === 'el' ? 'el-GR' : 'en-GB', {
-    day: '2-digit', month: '2-digit', ...(compact ? {} : { year: 'numeric' as const }), timeZone: 'UTC',
-  }).format(date);
+/** `date` is a civil day anchored at 12:00 UTC, so its UTC fields are the civil ones. */
+export function formatDate(date: Date, compact = false) {
+  const day = pad2(date.getUTCDate());
+  const month = pad2(date.getUTCMonth() + 1);
+  return compact ? `${day}/${month}` : `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
 export function dayName(date: Date, language: Language, index?: number) {
   const t = copy[language];
   if (index === 0) return t.today;
   if (index === 1) return t.tomorrow;
-  const name = new Intl.DateTimeFormat(language === 'el' ? 'el-GR' : 'en-GB', { weekday: 'long', timeZone: 'UTC' }).format(date);
-  return name.charAt(0).toLocaleUpperCase(language === 'el' ? 'el-GR' : 'en-GB') + name.slice(1);
+  return WEEKDAY_NAMES[language][date.getUTCDay()];
 }
 
 export function nextTurnInfo(date: Date, minute: number) {
